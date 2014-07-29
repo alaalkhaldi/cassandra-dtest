@@ -247,7 +247,7 @@ class TestConsistency(Tester):
         for n in xrange(0, 100):
             query_c1c2(cursor, n, "ONE")
 
-    def hinted_hand_off_after_topology_change_test(self):
+ def hinted_hand_off_after_topology_change_test(self):
         debug("Starting a cluster of 2 nodes.")
         cluster = self.cluster
         cluster.populate(2).start()
@@ -261,39 +261,23 @@ class TestConsistency(Tester):
         debug("Stopping node 2")
         node2.stop(gently=False)
 
-        debug("Create node 3")
-        node3 = Node('node3', cluster, True, ('127.0.0.3', 9160), ('127.0.0.3', 7000), '7300', '0', None, ('127.0.0.3',9042))
-        cluster.add(node3, True)
-        node3.start(jvm_args=["-Dconsistent.rangemovement=false"]);
-
-        debug("Insert data to node 3")
-        cursor = self.patient_cql_connection(node3, keyspace='ks').cursor()
+        debug("Insert data to node 1")
         for n in xrange(0, 100):
             insert_c1c2(cursor, n, "ONE")
 
-        debug("Stop node 3")
-        node3.stop(wait_other_notice=True)
-
-        debug("Starting node 4 to replace node 2")
-        node4 = Node('node4', cluster, True, ('127.0.0.4', 9160), ('127.0.0.4', 7000), '7400', '0', None, ('127.0.0.4',9042))
-        cluster.add(node4, True)
-        node4.start(replace_address='127.0.0.2', jvm_args=["-Dconsistent.rangemovement=false"])
-
-        # stop node1 to test hinted hand off for node3 only
-        node1.stop(wait_other_notice=True)
-
-        debug("Start node3 ..")
-        log_mark = node3.mark_log()
+        debug("Create node 3")
+        log_mark = node1.mark_log()
+        node3 = Node('node3', cluster, True, ('127.0.0.3', 9160), ('127.0.0.3', 7000), '7300', '0', None, ('127.0.0.3',9042))
+        cluster.add(node3, True)
         node3.start(jvm_args=["-Dconsistent.rangemovement=false"])
 
-        debug("Verifying hints are sent from node3 to node4")
-        node3.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=90)
-        node3.stop(wait_other_notice=True)
+        debug("Verifying hints are sent from node1 to node3")
+        node1.watch_log_for(["Finished hinted"], from_mark=log_mark, timeout=90)
 
         debug("Check node4 for all the keys that should have been delivered via HH")
         cursor = self.patient_cql_connection(node4, keyspace='ks').cursor()
         for n in xrange(0, 100):
-             query_c1c2(cursor, n, "ONE")
+            query_c1c2(cursor, n, "ONE")
 
     def readrepair_test(self):
         cluster = self.cluster
